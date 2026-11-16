@@ -16,9 +16,9 @@
   Cache-Control: public, max-age=300, must-revalidate
 /guestbook.js
   Cache-Control: public, max-age=300, must-revalidate
-/birthday.css
+/winter.css
   Cache-Control: public, max-age=300, must-revalidate
-/birthday.js
+/winter.js
   Cache-Control: public, max-age=300, must-revalidate
 /assets/*
   Cache-Control: public, max-age=86400, must-revalidate
