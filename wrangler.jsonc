@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "xuxuxiang-personal",
+  "main": "worker/index.js",
+  "account_id": "37733a50f189ab433e11474d6931373b",
+  "compatibility_date": "2026-10-15",
+  "workers_dev": true,
+  "routes": [
+    {"pattern": "xuxuxiang.fun", "custom_domain": true},
+    {"pattern": "www.xuxuxiang.fun", "custom_domain": true}
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "404-page"
+  },
+  "d1_databases": [
+    {
+      "binding": "GUESTBOOK_DB",
+      "database_name": "xuxuxiang-guestbook",
+      "database_id": "21a3a6b9-e33c-495b-b1bd-997f64d5b383",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

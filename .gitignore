@@ -1,0 +1,47 @@
+/public/
+/.wrangler/
+/node_modules/
+/output/
+/.playwright-cli/
+/design-previews/
+/backups/
+/DEPLOYMENT.md
+/DESIGN.md
+
+# Local credentials and data never belong in this repository.
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.db
+*.db-*
+*.dump
+*.sql
+!/migrations/0001_guestbook.sql
+
+# Keep legacy, machine-specific setup and original-image tools on the old computer.
+/tools/cloudflare-status.mjs
+/tools/provision-guestbook.mjs
+/tools/create-social-preview.mjs
+/tools/prepare-birthday-assets.mjs
+/tools/prepare-wechat-qr.mjs
+
+# Only the reviewed assets referenced by the site; other photos stay local.
+/assets/*
+!/assets/photo-01-clean.webp
+!/assets/photo-03-clean.webp
+!/assets/photo-05-clean.webp
+!/assets/photo-08-clean.webp
+!/assets/photo-09-clean.webp
+!/assets/photo-11.webp
+!/assets/photo-12.webp
+!/assets/photo-15.webp
+!/assets/wechat-qr.png

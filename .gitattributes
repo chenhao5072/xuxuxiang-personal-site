@@ -1,0 +1,5 @@
+# Keep the same build bytes and content hashes on Windows, macOS and Linux.
+* text=auto eol=lf
+*.webp binary
+*.jpg binary
+*.png binary
