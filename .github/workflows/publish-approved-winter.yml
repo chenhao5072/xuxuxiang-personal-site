@@ -1,0 +1,48 @@
+name: Publish approved winter version
+
+on:
+  push:
+    branches: ['release/winter-2026']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xuxuxiang-production
+  cancel-in-progress: false
+
+env:
+  APPROVED_SHA: c2f57398de19b3daef68542df1ad500935a4cdb1
+  PREVIOUS_MAIN: d1f918a7b97902b4bab41c361a125927727d3994
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: orchestration
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.APPROVED_SHA }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Assert reviewed source and build without Cloudflare credentials
+        working-directory: source
+        run: |
+          test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+          npm ci --no-audit --no-fund
+          npm run deploy:check
+      - name: Publish that source to the existing Worker and verify readback
+        working-directory: source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_REVIEW_TOKEN }}
+          CLOUDFLARE_SEND_METRICS: 'false'
+          GH_TOKEN: ${{ github.token }}
+        run: node ../orchestration/.github/release-winter.mjs
