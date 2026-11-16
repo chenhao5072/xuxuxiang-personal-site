@@ -71,76 +71,79 @@ const cfSummary = async (message) => {
   if (GITHUB_STEP_SUMMARY) await appendFile(GITHUB_STEP_SUMMARY, message + '\n');
 };
 
+
+// These UUIDs came from the first run of this exact approved commit.
+const oldId = '6f3e8fe4-f242-4f4b-9da3-ad134d296412';
+const id = 'b5a0942c-fa42-442c-96ee-aa974c3f412d';
+const cli = (args, timeout = 90000) => spawnSync('./node_modules/.bin/wrangler', args, {
+  encoding:'utf8', timeout, maxBuffer:4*1024*1024
+});
+const safeOut = (result) => ((result.stdout || '') + '\n' + (result.stderr || '')).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
+
 await checkRefs();
-const previous = await active();
-const oldId = previous?.versions?.[0]?.version_id;
-assert.ok(uuid.test(previous?.id || '') && uuid.test(oldId || '') && is100(previous, oldId), 'Unexpected active production deployment');
-const oldDetails = await cf('/versions/' + oldId);
-const oldBindings = bindingMap(oldDetails);
-const previousGuestbookTotal = await guestbook();
-assert.equal(oldBindings.get('GUESTBOOK_DB')?.type, 'd1', 'Original guestbook binding not found');
-assert.equal(oldBindings.get('GUESTBOOK_SECRET')?.type, 'secret_text', 'Original guestbook secret binding not found');
-await cfSummary('Rollback version: ' + oldId);
+let previous = await active();
+const safeToContinue = is100(previous, oldId) || is100(previous, id);
+await cfSummary('Active before retry: ' + previous?.id + ' ' + JSON.stringify(previous?.versions));
+assert.ok(safeToContinue, 'A different deployment is active; leaving it untouched');
+const [oldDetails, next, previousGuestbookTotal] = await Promise.all([
+  cf('/versions/' + oldId), cf('/versions/' + id), guestbook()
+]);
+for (const details of [oldDetails, next]) {
+  const bindings = bindingMap(details);
+  assert.equal(bindings.get('GUESTBOOK_DB')?.type, 'd1', 'Guestbook binding not found');
+  assert.equal(bindings.get('GUESTBOOK_SECRET')?.type, 'secret_text', 'Guestbook secret binding not found');
+  const db = bindings.get('GUESTBOOK_DB');
+  assert.equal(db.id ?? db.database_id ?? dbId, dbId);
+  assert.ok(details.resources?.script?.handlers?.includes('fetch'));
+}
 
-const result = spawnSync('./node_modules/.bin/wrangler', [
-  'versions', 'upload', '--config', 'wrangler.jsonc', '--keep-vars',
-  '--tag', 'git-' + APPROVED_SHA.slice(0,12), '--message', 'GitHub source ' + APPROVED_SHA
-], {encoding:'utf8', timeout:120000, maxBuffer:4*1024*1024});
-const log = ((result.stdout || '') + '\n' + (result.stderr || '')).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
-console.log(log);
-assert.equal(result.status, 0, 'Inactive Workers version upload did not complete');
-const id = log.match(/Version ID:\s*([a-f0-9-]{36})/i)?.[1] || '';
-assert.ok(uuid.test(id) && id !== oldId, 'No new version ID returned by Wrangler');
-
-const next = await cf('/versions/' + id);
-const bindings = bindingMap(next);
-const nextDb = bindings.get('GUESTBOOK_DB');
-assert.equal(nextDb?.type, 'd1', 'Candidate lost its production database binding');
-assert.equal(bindings.get('GUESTBOOK_SECRET')?.type, 'secret_text', 'Candidate lost its production secret binding');
-assert.equal(nextDb.id ?? nextDb.database_id ?? dbId, dbId, 'Candidate points at different D1 storage');
-assert.ok(next.resources?.script?.handlers?.includes('fetch'), 'Candidate has no web handler');
-await checkRefs();
-assert.equal((await active()).id, previous.id, 'Another Cloudflare deployment occurred; leave its traffic untouched');
-
-const promotion = {strategy:'percentage', versions:[{version_id:id, percentage:100}], annotations:{'workers/message':'Approved GitHub source '+APPROVED_SHA}};
-let newDeployment;
+let observed;
 try {
-  newDeployment = await cf('/deployments', promotion);
-  assert.ok(uuid.test(newDeployment.id) && is100(newDeployment,id), 'Cloudflare did not activate the requested version');
-  let success = false, detail = '';
+  if (is100(previous, oldId)) {
+    await checkRefs();
+    assert.equal((await active()).id, previous.id, 'Another deployment occurred; do not overwrite it');
+    const run = cli(['versions','deploy',id + '@100%', '--yes', '--config','wrangler.jsonc', '--message','Approved GitHub source ' + APPROVED_SHA]);
+    console.log(safeOut(run));
+    if (run.status !== 0) {
+      const readAfter = await active();
+      assert.ok(is100(readAfter, id), 'Wrangler promotion failed and candidate is not active');
+    }
+  }
+  let confirmed = false, details = '';
   for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt) await pause(3500 * attempt);
     try {
-      const live = await active();
-      assert.equal(live.id, newDeployment.id, 'Active deployment changed');
+      const actual = await active();
+      assert.ok(is100(actual,id),'Cloudflare deployment readback has not reached the new version: '+JSON.stringify(actual?.versions));
+      if (observed) assert.equal(actual.id, observed.id, 'Active deployment trace changed during verification');
+      observed = actual;
       const canonical = await fetch(origin + '/', {headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(15000)});
       const title = (await canonical.text()).match(/<title>(.*?)<\/title>/u)?.[1];
-      assert.equal(canonical.status, 200);
+      assert.equal(canonical.status,200);
       assert.equal(title, expectedTitle);
-      assert.ok(await guestbook() >= previousGuestbookTotal, 'The existing guestbook must remain accessible');
+      assert.ok(await guestbook() >= previousGuestbookTotal, 'Existing guestbook must remain accessible');
       const audit = spawnSync('npm',['run','verify:live'], {encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
       if (audit.status !== 0) {
-        detail = (audit.stderr || audit.stdout || '').slice(-1500);
+        details = (audit.stderr || audit.stdout || '').slice(-2500);
         throw Error('Full static-content readback did not pass');
       }
       const report = JSON.parse(await readFile('output/verification/online-readback.json','utf8'));
       assert.equal(report.title, expectedTitle);
       assert.ok(report.assets.length > 20 && report.assets.every(asset => asset.matchesBuild));
-      await cfSummary('Readback passed: ' + report.assets.length + ' exact static-file checks, the canonical and www hosts, redirects, 404 and the production guestbook GET.');
-      success = true;
+      await cfSummary('Readback passed: ' + report.assets.length + ' exact static-file checks, the canonical and www hosts, redirect, 404 and production guestbook GET.');
+      confirmed = true;
       break;
-    } catch (error) {
-      console.log('Readback attempt ' + (attempt + 1) + ': ' + error.message);
-    }
+    } catch (error) { console.log('Readback attempt ' + (attempt + 1) + ': ' + error.message); }
   }
-  assert.ok(success,'Production readback did not pass after retries. ' + detail);
-  await cfSummary('Cloudflare deployment: ' + newDeployment.id + '\nWorker version: ' + id + '\nApproved GitHub commit: ' + APPROVED_SHA);
+  assert.ok(confirmed, 'Production readback did not pass. ' + details);
+  await cfSummary('Cloudflare deployment: ' + observed.id + '\nWorker version: ' + id + '\nRollback version: ' + oldId + '\nApproved GitHub commit: ' + APPROVED_SHA);
 } catch (error) {
   const traffic = await active();
-  if (is100(traffic,id) && (!newDeployment || traffic.id === newDeployment.id)
-      && traffic.annotations?.['workers/message'] === promotion.annotations['workers/message']) {
-    await cf('/deployments', {strategy:'percentage',versions:[{version_id:oldId,percentage:100}],annotations:{'workers/message':'Safe rollback for GitHub '+APPROVED_SHA}});
-    assert.ok(is100(await active(),oldId), 'Could not confirm rollback');
+  if (observed && traffic?.id === observed.id && is100(traffic,id)) {
+    const back = cli(['versions','deploy',oldId + '@100%', '--yes','--config','wrangler.jsonc','--message','Safe rollback of GitHub source '+APPROVED_SHA]);
+    console.log(safeOut(back));
+    await pause(2000);
+    assert.ok(is100(await active(),oldId), 'Could not confirm automatic rollback; inspect Cloudflare immediately');
     await cfSummary('Automated rollback restored ' + oldId);
   }
   throw error;
