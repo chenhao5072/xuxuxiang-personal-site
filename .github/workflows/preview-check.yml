@@ -45,3 +45,12 @@ jobs:
           path: output/playwright/
           if-no-files-found: error
           retention-days: 7
+      - name: Create only the approved isolated Cloudflare preview
+        if: github.ref == 'refs/heads/preview/winter-2026'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_REVIEW_TOKEN }}
+          CLOUDFLARE_SEND_METRICS: 'false'
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx --no-install wrangler --version
+          npx --no-install wrangler preview --config wrangler.preview.jsonc --ignore-base-config --name winter-review --message "Reviewed from GitHub ${GITHUB_SHA}" --json | tee "$RUNNER_TEMP/cloudflare-preview.json"

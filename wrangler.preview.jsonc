@@ -1,0 +1,19 @@
+{
+  "name": "xuxuxiang-personal",
+  "main": "worker/preview.js",
+  "account_id": "37733a50f189ab433e11474d6931373b",
+  "compatibility_date": "2026-10-15",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "404-page"
+  },
+  "previews": {
+    "vars": {
+      "REVIEW_SHA256": "d30734cc44376e7659a528102bdb5d501ad41cc025ed2ff5060832e3b52328d9",
+      "REVIEW_EXPIRES": "1795417790994"
+    }
+  }
+}
