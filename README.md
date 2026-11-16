@@ -1,8 +1,12 @@
 # 许旭祥个人网站
 
-正式网站：[xuxuxiang.fun](https://xuxuxiang.fun/)。这个私有仓库保存当前生日版的完整源码和已审定的上线图片。GitHub 负责版本记录；网站、域名和留言仍在原 Cloudflare 项目，无自动上线流程。
+正式网站：[xuxuxiang.fun](https://xuxuxiang.fun/)。这个私有仓库保存完整源码、已审定的展示素材及维护流程。网站、域名和生产留言继续使用原 Cloudflare 项目。
 
-## 一、换电脑：克隆并本地预览
+## 一、在线修改、预览和审批
+
+按 [在线维护规范](AGENTS.md) 操作：从私有 GitHub 仓库的 `main` 新建独立 `preview/*` 分支，提交代码和已审定的照片，先查看同一提交的候选效果。站点负责人确认后才为 `main` 更新正式版本，并从这个提交发布到原 Worker；不要在 Cloudflare 单独修改代码导致两个版本不一致。
+
+## 可选：换电脑后本地预览
 
 安装 Git 和 Node.js（建议 Node.js 24 LTS，最低 22.13）。先用有仓库权限的 GitHub 账号登录 Git 凭据管理器，再在任意工作目录执行：
 
@@ -17,9 +21,9 @@ npm run preview
 
 常用编辑位置：
 
-- `index.html`：邀请函、页面文案和照片。修改邀约文案时，也同步检查 `birthday.js` 的复制文本、页面分享说明及 `social-preview.jpg`。
-- `styles.css`、`birthday.css`：通用样式和生日主题；`app.js`、`birthday.js`、`guestbook.js`：页面交互。
-- `assets/`：上线用的 8 张照片和裁切后的二维码。替换原文件前确认公开范围；新增素材需同时更新页面引用和 `.gitignore` 的允许列表。不要提交未裁切原片、原始二维码卡片或历史预览；`photo-10` 始终排除。
+- `index.html`：页面文案和照片；更换主题时同步检查页面分享说明及 `social-preview.jpg`。
+- `styles.css`、`winter.css`：通用样式和冬日主题；`app.js`、`winter.js`、`guestbook.js`：页面交互。
+- `assets/`：上线用的照片、动图和裁切后的二维码。替换原文件前确认公开范围；新增素材需同时更新页面引用和 `.gitignore` 的允许列表。不要提交未裁切原片、原始二维码卡片或历史预览；`photo-10` 始终排除。
 - `worker/index.js`、`migrations/`：留言板接口和数据库结构。仓库只包含迁移脚本，不包含留言数据。
 
 构建时只将公开文件复制到 `public/`，为首页中的样式和脚本加上内容哈希。不要手改或提交生成目录。

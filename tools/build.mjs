@@ -10,8 +10,8 @@ const sourceFiles = [
   'styles.css',
   'app.js',
   'guestbook.js',
-  'birthday.css',
-  'birthday.js',
+  'winter.css',
+  'winter.js',
   '404.html',
   'favicon.svg',
   'social-preview.jpg',
@@ -33,14 +33,15 @@ if (outputInfo && (!outputInfo.isDirectory() || outputInfo.isSymbolicLink()
 }
 
 const pageSources = await Promise.all(
-  ['index.html', '404.html', 'styles.css', 'app.js', 'birthday.css', 'birthday.js'].map((file) => fs.readFile(path.join(root, file), 'utf8')),
+  ['index.html', '404.html', 'styles.css', 'app.js', 'winter.css', 'winter.js'].map((file) => fs.readFile(path.join(root, file), 'utf8')),
 );
 const assets = new Set();
 for (const source of pageSources) {
   for (const match of source.matchAll(/(?:["'(]|\s)(\/assets\/[a-zA-Z0-9._/-]+)/g)) {
     const relative = match[1].slice(1);
     const approvedPhoto = /^assets\/photo-\d{2}(?:-clean|-thumb)?\.webp$/.test(relative) && !/photo-10(?:[.-])/.test(relative);
-    if (!approvedPhoto && relative !== 'assets/wechat-qr.png') {
+    const approvedExtra = ['assets/wechat-qr.png', 'assets/winter-loop.gif', 'assets/winter-loop-poster.webp'].includes(relative);
+    if (!approvedPhoto && !approvedExtra) {
       throw new Error(`Asset is not approved for public delivery: ${relative}`);
     }
     assets.add(relative);
@@ -52,7 +53,7 @@ const files = [...sourceFiles, ...assets];
 // Validate every source before changing the previous successful build.
 await Promise.all(files.map((file) => fs.access(path.join(root, file))));
 const assetVersions = Object.fromEntries(await Promise.all(
-  ['styles.css', 'app.js', 'guestbook.js', 'birthday.css', 'birthday.js'].map(async (file) => [
+  ['styles.css', 'app.js', 'guestbook.js', 'winter.css', 'winter.js'].map(async (file) => [
     file,
     createHash('sha256').update(await fs.readFile(path.join(root, file))).digest('hex').slice(0, 12),
   ]),
@@ -67,7 +68,7 @@ for (const file of files) {
   await fs.mkdir(path.dirname(target), { recursive: true });
   if (file === 'index.html') {
     const html = (await fs.readFile(source, 'utf8')).replace(
-      /((?:href|src)=["']\/)(styles\.css|app\.js|guestbook\.js|birthday\.css|birthday\.js)(?:\?[^"']*)?(["'])/g,
+      /((?:href|src)=["']\/)(styles\.css|app\.js|guestbook\.js|winter\.css|winter\.js)(?:\?[^"']*)?(["'])/g,
       (_, prefix, asset, quote) => `${prefix}${asset}?v=${assetVersions[asset]}${quote}`,
     );
     await fs.writeFile(target, html, 'utf8');
