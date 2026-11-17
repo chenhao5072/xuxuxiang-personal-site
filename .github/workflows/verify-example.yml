@@ -1,0 +1,60 @@
+name: Verify reusable site example
+
+on:
+  push:
+    branches: [main, prepare/open-source]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Check source, run tests and build
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+      - name: Start example and test its isolated guestbook
+        run: |
+          npm run preview:example > "$RUNNER_TEMP/site-example.log" 2>&1 &
+          preview=$!
+          trap 'kill "$preview" 2>/dev/null || true; tail -n 30 "$RUNNER_TEMP/site-example.log"' EXIT
+          timeout 55 bash -c 'until curl -fsS --max-time 3 -o /dev/null http://127.0.0.1:4192/api/guestbook; do sleep 2; done'
+          node --input-type=module <<'CHECK'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const origin = 'http://127.0.0.1:4192';
+          const config = JSON.parse(await readFile('wrangler.example.jsonc', 'utf8'));
+          assert.equal(config.account_id, undefined);
+          assert.equal(config.routes, undefined);
+          const page = await fetch(origin);
+          assert.equal(page.status, 200);
+          assert.match(await page.text(), /冬日手记/);
+          const url = origin + '/api/guestbook';
+          const before = await fetch(url);
+          assert.equal(before.status, 200);
+          const {token, total} = await before.json();
+          assert.equal(total, 0);
+          const sent = await fetch(url, {
+            method: 'POST',
+            headers: {'content-type':'application/json', origin},
+            body: JSON.stringify({token, website:'', name:'示例验收', message:'这是独立示例库中的测试留言。', submissionId:crypto.randomUUID()})
+          });
+          assert.ok([200,201].includes(sent.status), 'Example guestbook submission returned ' + sent.status);
+          const saved = await (await fetch(url)).json();
+          assert.equal(saved.total, 1);
+          assert.equal(saved.messages[0].message, '这是独立示例库中的测试留言。');
+          console.log('Homepage and guestbook write/read passed with the standalone configuration.');
+          CHECK

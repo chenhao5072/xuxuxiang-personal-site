@@ -49,3 +49,6 @@
 !/assets/photo-17-clean.webp
 !/assets/winter-loop.gif
 !/assets/winter-loop-poster.webp
+
+# Independent deployment configuration
+/wrangler.custom.jsonc

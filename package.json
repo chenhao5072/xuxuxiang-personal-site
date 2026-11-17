@@ -12,12 +12,14 @@
     "preview": "npm run build && wrangler d1 migrations apply GUESTBOOK_DB --local --config wrangler.jsonc && wrangler dev --local --ip 127.0.0.1 --port 4192 --var GUESTBOOK_SECRET:local-preview-only --config wrangler.jsonc",
     "deploy:check": "npm run verify && wrangler deploy --dry-run --config wrangler.jsonc",
     "deploy": "npm run verify && wrangler deploy --config wrangler.jsonc",
-    "verify:live": "node tools/verify-live.mjs"
+    "verify:live": "node tools/verify-live.mjs",
+    "preview:example": "npm run build && wrangler d1 migrations apply GUESTBOOK_DB --local --config wrangler.example.jsonc && wrangler dev --local --ip 127.0.0.1 --port 4192 --var GUESTBOOK_SECRET:local-preview-only --config wrangler.example.jsonc"
   },
   "devDependencies": {
     "wrangler": "4.162.0"
   },
   "engines": {
     "node": ">=22.13.0"
-  }
+  },
+  "license": "MIT"
 }
